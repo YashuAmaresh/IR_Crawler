@@ -28,10 +28,10 @@ class CrawlerFrame(IApplication):
     def __init__(self, frame):
         self.starttime = time()
         # Set app_id <student_id1>_<student_id2>...
-        self.app_id = ""
+        self.app_id = "31721795_50924931_85241493"
         # Set user agent string to IR W17 UnderGrad <student_id1>, <student_id2> ...
         # If Graduate studetn, change the UnderGrad part to Grad.
-        self.UserAgentString = None
+        self.UserAgentString = "IR W17 Grad 31721795 50924931 85241493"
 		
         self.frame = frame
         assert(self.UserAgentString != None)
@@ -81,7 +81,6 @@ def process_url_group(group, useragentstr):
 STUB FUNCTIONS TO BE FILLED OUT BY THE STUDENT.
 '''
 def extract_next_links(rawDatas):
-    outputLinks = list()
     '''
     rawDatas is a list of objs -> [raw_content_obj1, raw_content_obj2, ....]
     Each obj is of type UrlResponse  declared at L28-42 datamodel/search/datamodel.py
@@ -92,6 +91,42 @@ def extract_next_links(rawDatas):
 
     Suggested library: lxml
     '''
+
+    outputLinks = list()
+    from bs4 import BeautifulSoup
+    from lxml.html import soupparser
+
+    print rawDatas
+
+    for data in rawDatas:
+        curr_url = data.url
+        htmlStr = data.content
+
+        print curr_url, htmlStr
+
+        if htmlStr:
+
+            # BeautifulSoup(htmlStr, "html.parser")
+
+            '''
+            Using BeautifulSoup Parser to auto-detect the encoding of the HTML content
+            '''
+
+            root = html.fromstring(htmlStr)
+            try:
+                ignore = html.tostring(root, encoding='unicode')
+
+            except UnicodeDecodeError:
+                root = html.soupparser.fromstring(htmlStr)
+            # dom = soupparser.fromstring(htmlStr)
+            # dom =  html.fromstring(htmlStr)
+            # print dom.xpath('//a/@href')
+            for link in root.xpath('//a/@href'): # select the url in href for all a tags(links)
+                print link
+
+            links = root.xpath('//a/@href')
+            absoluteLinks = convertToAbsolute(curr_url, links)
+            
     return outputLinks
 
 def is_valid(url):
@@ -101,16 +136,89 @@ def is_valid(url):
 
     This is a great place to filter out crawler traps.
     '''
+
+    try:
+        already_visited
+
+    except NameError:
+        already_visited = set()
+
     parsed = urlparse(url)
     if parsed.scheme not in set(["http", "https"]):
         return False
     try:
-        return ".ics.uci.edu" in parsed.hostname \
-            and not re.match(".*\.(css|js|bmp|gif|jpe?g|ico" + "|png|tiff?|mid|mp2|mp3|mp4"\
-            + "|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf" \
-            + "|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1" \
-            + "|thmx|mso|arff|rtf|jar|csv"\
-            + "|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+        return_val = True
+
+        return_val = ".ics.uci.edu" in parsed.hostname \
+        and not re.match(".*\.(css|js|bmp|gif|jpe?g|ico" + "|png|tiff?|mid|mp2|mp3|mp4"\
+        + "|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf" \
+        + "|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1" \
+        + "|thmx|mso|arff|rtf|jar|csv"\
+        + "|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+
+        print "Parsed hostname : ", parsed.hostname, " : ", return_val
+        '''
+        Check here for crawler traps
+        '''
+        # 1. Repeating directories
+        if re.match("^.*?(/.+?/).*?\\1.*$|^.*?/(.+?/)\\2.*$", parsed.path.lower()):
+            return_val = False
+
+        # 2. Calendar traps - Keep track of already visited paths
+        elif parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
+            return_val = False
+
+        #Add the current URL path to set of already visited paths 
+        else: 
+            already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
+            return_val = True
+
+        return return_val
 
     except TypeError:
         print ("TypeError for ", parsed)
+
+
+def convertToAbsolute(url, links):
+    '''
+        <scheme>://<username>:<password>@<host>:<port>/<path>;<parameters>?<query>#<fragment>
+        Not handled mailto and fragments(#)
+        Also, javascript needs to be handled
+    '''
+    parsed_url = urlparse(url)
+    base_url = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path
+    absolutelinks = list()
+    for link in links:
+        link = link.strip()
+
+        if link.find('http') == 0:
+            absolutelinks.append(link)
+
+        elif link.find('//') == 0:
+            absolutelinks.append(link)
+
+        elif link.find('#') == 0 or link.find("javascript") == 0 or link.find("mailto") == 0: #****
+            pass
+
+        elif link.find("/") == 0:
+            if re.match(".*\.(asp|aspx|axd|asx|asmx|ashx|css|cfm|yaws|swf|html|htm|xhtml" \
+                + "|jhtmljsp|jspx|wss|do|action|js|pl|php|php4|php3|phtml|py|rb|rhtml|shtml|xml|rss|svg|cgi|dll)$", parsed_url.path.lower()):
+                # print "\n\n\n\nHere\n\n\n\n"
+                index = parsed_url.path.rfind("/")
+                parent_path = parsed_url.path[:index]
+                result = parsed_url.scheme +"://"+ parsed_url.netloc + parent_path + link
+
+            else:
+                result = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path.rstrip("/") + link
+
+            absolutelinks.append(result)
+
+        else:
+
+            absolutelinks.append(urljoin(base_url,link))
+    
+    print base_url
+    
+    for urls in absolutelinks:
+        print "Link= " + urls +"\n" 
+
