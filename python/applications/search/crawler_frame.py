@@ -2,13 +2,13 @@ import logging
 from datamodel.search.datamodel import ProducedLink, OneUnProcessedGroup, robot_manager
 from spacetime_local.IApplication import IApplication
 from spacetime_local.declarations import Producer, GetterSetter, Getter
-#from lxml import html,etree
+from lxml import html,etree
 import re, os
 from time import time
 
 try:
     # For python 2
-    from urlparse import urlparse, parse_qs
+    from urlparse import urlparse, parse_qs, urljoin
 except ImportError:
     # For python 3
     from urllib.parse import urlparse, parse_qs
@@ -23,7 +23,7 @@ MAX_LINKS_TO_DOWNLOAD = 3000
 
 @Producer(ProducedLink)
 @GetterSetter(OneUnProcessedGroup)
-class CrawlerFrame(IApplication):
+class CrawlerFrame(IApplication):   
 
     def __init__(self, frame):
         self.starttime = time()
@@ -96,37 +96,38 @@ def extract_next_links(rawDatas):
     from bs4 import BeautifulSoup
     from lxml.html import soupparser
 
-    print rawDatas
+    #print rawDatas
+    with open ( "output001.txt" , "a" ) as op:
+        for data in rawDatas:
+            curr_url = data.url
+            htmlStr = data.content
 
-    for data in rawDatas:
-        curr_url = data.url
-        htmlStr = data.content
+            #print curr_url, htmlStr
+            op.write ( "Output base url = %s\n" % curr_url ) 
+            op.write("\n")
+            if htmlStr:
 
-        print curr_url, htmlStr
+                # BeautifulSoup(htmlStr, "html.parser")
 
-        if htmlStr:
+                '''
+                Using BeautifulSoup Parser to auto-detect the encoding of the HTML content
+                '''
 
-            # BeautifulSoup(htmlStr, "html.parser")
+                root = html.fromstring(htmlStr)
+                try:
+                    ignore = html.tostring(root, encoding='unicode')
 
-            '''
-            Using BeautifulSoup Parser to auto-detect the encoding of the HTML content
-            '''
-
-            root = html.fromstring(htmlStr)
-            try:
-                ignore = html.tostring(root, encoding='unicode')
-
-            except UnicodeDecodeError:
-                root = html.soupparser.fromstring(htmlStr)
-            # dom = soupparser.fromstring(htmlStr)
-            # dom =  html.fromstring(htmlStr)
-            # print dom.xpath('//a/@href')
-            for link in root.xpath('//a/@href'): # select the url in href for all a tags(links)
-                print link
-
-            links = root.xpath('//a/@href')
-            absoluteLinks = convertToAbsolute(curr_url, links)
-            
+                except UnicodeDecodeError:
+                    root = html.soupparser.fromstring(htmlStr)
+                # dom = soupparser.fromstring(htmlStr)
+                # dom =  html.fromstring(htmlStr)
+                # print dom.xpath('//a/@href')
+                for link in root.xpath('//a/@href'): # select the url in href for all a tags(links)
+                    #print link
+                    op.write("Link = %s"% link + '\n')
+                links = root.xpath('//a/@href')
+                absoluteLinks = convertToAbsolute(curr_url, links)
+                
     return outputLinks
 
 def is_valid(url):
@@ -156,23 +157,26 @@ def is_valid(url):
         + "|thmx|mso|arff|rtf|jar|csv"\
         + "|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
 
-        print "Parsed hostname : ", parsed.hostname, " : ", return_val
+       # print "Parsed hostname : ", parsed.hostname, " : "
         '''
         Check here for crawler traps
         '''
-        # 1. Repeating directories
-        if re.match("^.*?(/.+?/).*?\\1.*$|^.*?/(.+?/)\\2.*$", parsed.path.lower()):
-            return_val = False
+        if(return_val): #Only if the url is valid check for the traps
+            # 1. Repeating directories
+            if re.match("^.*?(/.+?/).*?\\1.*$|^.*?/(.+?/)\\2.*$", parsed.path.lower()):
+                print "In Repeating Directories"
+                print url
+                return_val = False        
 
-        # 2. Calendar traps - Keep track of already visited paths
-        elif parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
-            return_val = False
+            # 2. Crawler traps - Keep track of already visited paths
+            elif parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
+                return_val = False
 
-        #Add the current URL path to set of already visited paths 
-        else: 
-            already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
-            return_val = True
-
+            #Add the current URL path to set of already visited paths 
+            else: 
+                already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
+                return_val = True
+        print return_val
         return return_val
 
     except TypeError:
@@ -188,37 +192,47 @@ def convertToAbsolute(url, links):
     parsed_url = urlparse(url)
     base_url = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path
     absolutelinks = list()
-    for link in links:
-        link = link.strip()
+    with open("output101.txt","a") as op:
+        for link in links:
+            link = link.strip()
 
-        if link.find('http') == 0:
-            absolutelinks.append(link)
+            if link.find('http') == 0 and is_valid(link):
+                print "Absolute = " + link 
+                absolutelinks.append(link)
 
-        elif link.find('//') == 0:
-            absolutelinks.append(link)
+            elif link.find('//') == 0 and is_valid(link):
+                print "Second Absolute = " + link
+                absolutelinks.append(link)
 
-        elif link.find('#') == 0 or link.find("javascript") == 0 or link.find("mailto") == 0: #****
-            pass
+            elif link.find('#') == 0 or link.find("javascript") == 0 or link.find("mailto") == 0: #****
+                print "#"
+                pass
 
-        elif link.find("/") == 0:
-            if re.match(".*\.(asp|aspx|axd|asx|asmx|ashx|css|cfm|yaws|swf|html|htm|xhtml" \
-                + "|jhtmljsp|jspx|wss|do|action|js|pl|php|php4|php3|phtml|py|rb|rhtml|shtml|xml|rss|svg|cgi|dll)$", parsed_url.path.lower()):
-                # print "\n\n\n\nHere\n\n\n\n"
-                index = parsed_url.path.rfind("/")
-                parent_path = parsed_url.path[:index]
-                result = parsed_url.scheme +"://"+ parsed_url.netloc + parent_path + link
+            elif link.find("/") == 0:
+                if re.match(".*\.(asp|aspx|axd|asx|asmx|ashx|css|cfm|yaws|swf|html|htm|xhtml" \
+                    + "|jhtmljsp|jspx|wss|do|action|js|pl|php|php4|php3|phtml|py|rb|rhtml|shtml|xml|rss|svg|cgi|dll)$", parsed_url.path.lower()):
+                    # print "\n\n\n\nHere\n\n\n\n"
+                    index = parsed_url.path.rfind("/")
+                    parent_path = parsed_url.path[:index]
+                    result = parsed_url.scheme +"://"+ parsed_url.netloc + parent_path + link
+                    #print "Case3"
+                else:
+                    result = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path.rstrip("/") + link
+                    #print "Case3 Else" 
+                if(is_valid(result)):
+                    print "Case 3 " + result
+                    absolutelinks.append(result)
 
             else:
-                result = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path.rstrip("/") + link
-
-            absolutelinks.append(result)
-
-        else:
-
-            absolutelinks.append(urljoin(base_url,link))
-    
-    print base_url
-    
-    for urls in absolutelinks:
-        print "Link= " + urls +"\n" 
+                
+                result=urljoin(base_url,link)
+                if(is_valid(result)):
+                    print "Else = " + result
+                    absolutelinks.append(result)
+        
+        print base_url
+        op.write("Base_url = " + base_url + '\n' )
+        for urls in absolutelinks:
+            print "Link= " + urls +"\n"
+            op.write("Link= " +urls +'\n')
 
