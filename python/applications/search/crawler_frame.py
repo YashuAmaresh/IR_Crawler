@@ -131,8 +131,14 @@ def extract_next_links(rawDatas):
             print "Already visited in extract_next_links"
             continue
 
+        else:
+            print "Not yet visited"
+            already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
+            # return_val = True
+
         if htmlStr and htmlStr.strip() != "":
 
+            # print "Here"
             # BeautifulSoup(htmlStr, "html.parser")
 
             '''
@@ -142,6 +148,7 @@ def extract_next_links(rawDatas):
                 root = html.fromstring(htmlStr)
 
             except ParserError:
+                print "Parse Error occured"
                 continue
 
             try:
@@ -222,17 +229,17 @@ def is_valid(url):
         if not return_val:  #Counting invalid links
             num_invalid_links += 1
 
-        else:
-            if parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
-                print "Already visited"
-                # return_val = False
-                # is_repeated_url = True
+        # else:
+        #     if parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
+        #         print "Already visited"
+        #         # return_val = False
+        #         # is_repeated_url = True
 
-                #Add the current URL path to set of already visited paths 
-            else: 
-                print "Not yet visited"
-                already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
-                # return_val = True
+        #         #Add the current URL path to set of already visited paths 
+        #     else: 
+        #         print "Not yet visited"
+        #         already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
+        #         # return_val = True
 
         print return_val
         return return_val
@@ -250,11 +257,15 @@ def convertToAbsolute(url, links):
 
     global subdomains_visited
     parsed_url = urlparse(url)
+    # print "Here in convert to absolute"
 
-    if ".ics.uci.edu" in parsed_url.netloc:
+    if "ics.uci.edu" in parsed_url.netloc:
         subdomains_visited[parsed_url.netloc] = subdomains_visited.get(parsed_url.netloc, 0) + 1
+        print "Added to list of subdomains"
     # To maintain a dict of subdomains visted
-    
+
+    else:
+        print "Bad URL not added to list of subdomains - ", parsed_url.netloc
 
     base_url = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path
     absolutelinks = list()
