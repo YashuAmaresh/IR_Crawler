@@ -124,6 +124,13 @@ def extract_next_links(rawDatas):
         #print curr_url, htmlStr
         # op.write ( "Output base url = %s\n" % curr_url ) 
         # op.write("\n")
+
+        parsed = urlparse(curr_url)
+
+        if parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
+            print "Already visited in extract_next_links"
+            continue
+
         if htmlStr and htmlStr.strip() != "":
 
             # BeautifulSoup(htmlStr, "html.parser")
@@ -193,17 +200,6 @@ def is_valid(url):
         Check here for crawler traps
         '''
         if(return_val): #Only if the url is valid check for the traps
-            
-            if parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
-                print "Already visited"
-                return_val = False
-                is_repeated_url = True
-
-            #Add the current URL path to set of already visited paths 
-            else: 
-                print "Not yet visited"
-                already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
-                return_val = True
 
             # 1. Repeating directories
             url_str = parsed.path.lower().rstrip("/") + "/"
@@ -218,8 +214,21 @@ def is_valid(url):
         else:
             print "URL out of domain or is a non-crawlable file type: ", url
 
-        if not return_val and not is_repeated_url:  #Counting invalid links
+        
+        if not return_val:  #Counting invalid links
             num_invalid_links += 1
+
+        else:
+            if parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
+                print "Already visited"
+                # return_val = False
+                # is_repeated_url = True
+
+                #Add the current URL path to set of already visited paths 
+            else: 
+                print "Not yet visited"
+                already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
+                # return_val = True
 
         print return_val
         return return_val
@@ -384,6 +393,5 @@ def is_absolute_valid(url):
 
     except TypeError:
         print ("TypeError for ", parsed)
-
 
 
