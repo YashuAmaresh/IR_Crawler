@@ -206,6 +206,14 @@ def is_valid(url):
                 print url
                 return_val = False        
 
+            # 2. Crawler traps - Keep track of already visited paths
+            # elif parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
+            #     return_val = False
+
+            # #Add the current URL path to set of already visited paths 
+            # else: 
+            #     already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
+            #     return_val = True
 
             if "archive.ics.uci.edu" in parsed.netloc.lower():
                 return_val = False
@@ -241,11 +249,11 @@ def convertToAbsolute(url, links):
     for link in links:
         link = link.strip()
 
-        if link.find('http') == 0 and is_absolute_valid(link):
+        if link.find('http') == 0 and is_valid(link):
             print "Absolute = " + link 
             absolutelinks.append(link)
 
-        elif link.find('//') == 0 and is_absolute_valid(link):
+        elif link.find('//') == 0 and is_valid(link):
             print "Second Absolute = " + link
             absolutelinks.append(link)
 
@@ -253,10 +261,30 @@ def convertToAbsolute(url, links):
             print "#"
             pass
 
+        # elif link.find("/") == 0:
+        #     url_given = parsed_url.path.lower().strip().rstrip("/")
+        #     if re.match(".*\.(asp|aspx|axd|asx|asmx|ashx|css|cfm|yaws|swf|html|htm|xhtml" \
+        #         + "|jhtmljsp|jspx|wss|do|action|js|pl|php|php4|php3|phtml|py|rb|rhtml|shtml|xml|rss|svg|cgi|dll)$", url_given):
+        #         # print "\n\n\n\nHere\n\n\n\n"
+
+        #         index = url_given.rfind("/")
+        #         parent_path = parsed_url.path[:index]
+
+        #         print "URL: ", parsed_url.netloc, " : ", parsed_url.path, " -> ", parent_path, "-> ", link
+        #         result = parsed_url.scheme +"://"+ parsed_url.netloc + parent_path + link
+        #         print "Case3", result
+        #     else:
+        #         result = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path.rstrip("/") + link
+        #         print "Case3 Else" 
+
+        #     if(is_valid(result)):
+        #         print "Case 3 " + result
+        #         absolutelinks.append(result)
+
         else:
             
             result = urljoin(base_url,link)
-            if(is_absolute_valid(result)):
+            if(is_valid(result)):
                 print "Else = " + result
                 absolutelinks.append(result)
     
