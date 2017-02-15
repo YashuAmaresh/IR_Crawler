@@ -148,11 +148,14 @@ def extract_next_links(rawDatas):
                 # op.write("Link = %s"% link + '\n')
             links = root.xpath('//a/@href')
             absoluteLinks = convertToAbsolute(curr_url, links)
+            result = set(absoluteLinks)
 
 
-            if len(absoluteLinks) > max_outlinks:
-                max_outlinks = len(absoluteLinks)
+            if len(result) > max_outlinks:
+                max_outlinks = len(result)
                 max_outlinks_url = curr_url
+
+            outputLinks.extend(result)
                 
     return outputLinks
 
@@ -203,17 +206,11 @@ def is_valid(url):
                 print url
                 return_val = False        
 
-            # 2. Crawler traps - Keep track of already visited paths
-            # elif parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
-            #     return_val = False
 
-            # #Add the current URL path to set of already visited paths 
-            # else: 
-            #     already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
-            #     return_val = True
-
+            if "archive.ics.uci.edu" in parsed.netloc.lower():
+                return_val = False
         else:
-            print "URL out of domain: ", url
+            print "URL out of domain or is a non-crawlable file type: ", url
 
         if not return_val:  #Counting invalid links
             num_invalid_links += 1
@@ -255,26 +252,6 @@ def convertToAbsolute(url, links):
         elif link.find('#') == 0 or link.find("javascript") == 0 or link.find("mailto") == 0: #****
             print "#"
             pass
-
-        # elif link.find("/") == 0:
-        #     url_given = parsed_url.path.lower().strip().rstrip("/")
-        #     if re.match(".*\.(asp|aspx|axd|asx|asmx|ashx|css|cfm|yaws|swf|html|htm|xhtml" \
-        #         + "|jhtmljsp|jspx|wss|do|action|js|pl|php|php4|php3|phtml|py|rb|rhtml|shtml|xml|rss|svg|cgi|dll)$", url_given):
-        #         # print "\n\n\n\nHere\n\n\n\n"
-
-        #         index = url_given.rfind("/")
-        #         parent_path = parsed_url.path[:index]
-
-        #         print "URL: ", parsed_url.netloc, " : ", parsed_url.path, " -> ", parent_path, "-> ", link
-        #         result = parsed_url.scheme +"://"+ parsed_url.netloc + parent_path + link
-        #         print "Case3", result
-        #     else:
-        #         result = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path.rstrip("/") + link
-        #         print "Case3 Else" 
-
-        #     if(is_valid(result)):
-        #         print "Case 3 " + result
-        #         absolutelinks.append(result)
 
         else:
             
@@ -329,6 +306,8 @@ def is_absolute_valid(url):
                 print url
                 return_val = False       
 
+            if "archive.ics.uci.edu" in parsed.netloc.lower():
+                return_val = False
 
         else:
             print "URL out of domain: ", url
