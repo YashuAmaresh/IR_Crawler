@@ -21,6 +21,12 @@ url_count = (set()
     set([line.strip() for line in open("successful_urls.txt").readlines() if line.strip() != ""]))
 MAX_LINKS_TO_DOWNLOAD = 3000
 
+num_invalid_links = 0
+max_outlinks = 0
+max_outlinks_url = ""
+subdomains_visited = dict()
+already_visited = set()
+
 @Producer(ProducedLink)
 @GetterSetter(OneUnProcessedGroup)
 class CrawlerFrame(IApplication):   
@@ -32,7 +38,7 @@ class CrawlerFrame(IApplication):
         # Set user agent string to IR W17 UnderGrad <student_id1>, <student_id2> ...
         # If Graduate studetn, change the UnderGrad part to Grad.
         self.UserAgentString = "IR W17 Grad 31721795 50924931 85241493"
-		
+        
         self.frame = frame
         assert(self.UserAgentString != None)
         assert(self.app_id != "")
@@ -60,6 +66,15 @@ class CrawlerFrame(IApplication):
             self.done = True
 
     def shutdown(self):
+        f = open("Analytics", "w")
+        f.write("Subdomains visited and their count:\n")
+        for key in subdomains_visited:
+            f.write(key + " : " + str(subdomains_visited[key]) + "\n")
+        f.write("\n\n")
+        f.write("Number of invalid links received: " + str(num_invalid_links) + "\n")
+        f.write("Page with most outlinks: " + str(max_outlinks_url) + " - " + str(max_outlinks) + " number of outlinks.\n")
+        f.close()
+
         print "downloaded ", len(url_count), " in ", time() - self.starttime, " seconds."
         pass
 
@@ -91,42 +106,53 @@ def extract_next_links(rawDatas):
 
     Suggested library: lxml
     '''
+    global max_outlinks
+    global max_outlinks_url
 
     outputLinks = list()
     from bs4 import BeautifulSoup
     from lxml.html import soupparser
 
     #print rawDatas
-    with open ( "output001.txt" , "a" ) as op:
-        for data in rawDatas:
-            curr_url = data.url
-            htmlStr = data.content
+    # with open ( "output001.txt" , "a" ) as op:
+    for data in rawDatas:
+        curr_url = data.url
+        htmlStr = data.content
+        if data.is_redirected:
+            curr_url = data.final_url
 
-            #print curr_url, htmlStr
-            op.write ( "Output base url = %s\n" % curr_url ) 
-            op.write("\n")
-            if htmlStr:
+        #print curr_url, htmlStr
+        # op.write ( "Output base url = %s\n" % curr_url ) 
+        # op.write("\n")
+        if htmlStr and htmlStr.strip() != "":
 
-                # BeautifulSoup(htmlStr, "html.parser")
+            # BeautifulSoup(htmlStr, "html.parser")
 
-                '''
-                Using BeautifulSoup Parser to auto-detect the encoding of the HTML content
-                '''
+            '''
+            Using BeautifulSoup Parser to auto-detect the encoding of the HTML content
+            '''
 
-                root = html.fromstring(htmlStr)
-                try:
-                    ignore = html.tostring(root, encoding='unicode')
+            root = html.fromstring(htmlStr)
+            
+            try:
+                
+                ignore = html.tostring(root, encoding='unicode')
 
-                except UnicodeDecodeError:
-                    root = html.soupparser.fromstring(htmlStr)
-                # dom = soupparser.fromstring(htmlStr)
-                # dom =  html.fromstring(htmlStr)
-                # print dom.xpath('//a/@href')
-                for link in root.xpath('//a/@href'): # select the url in href for all a tags(links)
-                    #print link
-                    op.write("Link = %s"% link + '\n')
-                links = root.xpath('//a/@href')
-                absoluteLinks = convertToAbsolute(curr_url, links)
+            except UnicodeDecodeError:
+                root = html.soupparser.fromstring(htmlStr)
+            # dom = soupparser.fromstring(htmlStr)
+            # dom =  html.fromstring(htmlStr)
+            # print dom.xpath('//a/@href')
+            # for link in root.xpath('//a/@href'): # select the url in href for all a tags(links)
+            #     print link
+                # op.write("Link = %s"% link + '\n')
+            links = root.xpath('//a/@href')
+            absoluteLinks = convertToAbsolute(curr_url, links)
+
+
+            if len(absoluteLinks) > max_outlinks:
+                max_outlinks = len(absoluteLinks)
+                max_outlinks_url = curr_url
                 
     return outputLinks
 
@@ -137,12 +163,10 @@ def is_valid(url):
 
     This is a great place to filter out crawler traps.
     '''
+    global num_invalid_links
+    global already_visited
 
-    try:
-        already_visited
-
-    except NameError:
-        already_visited = set()
+    
 
     parsed = urlparse(url)
     if parsed.scheme not in set(["http", "https"]):
@@ -162,6 +186,17 @@ def is_valid(url):
         Check here for crawler traps
         '''
         if(return_val): #Only if the url is valid check for the traps
+            
+            if parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
+                print "Already visited"
+                return_val = False
+
+            #Add the current URL path to set of already visited paths 
+            else: 
+                print "Not yet visited"
+                already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
+                return_val = True
+
             # 1. Repeating directories
             if re.match("^.*?(/.+?/).*?\\1.*$|^.*?/(.+?/)\\2.*$", parsed.path.lower()):
                 print "In Repeating Directories"
@@ -169,13 +204,20 @@ def is_valid(url):
                 return_val = False        
 
             # 2. Crawler traps - Keep track of already visited paths
-            elif parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
-                return_val = False
+            # elif parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/") in already_visited:
+            #     return_val = False
 
-            #Add the current URL path to set of already visited paths 
-            else: 
-                already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
-                return_val = True
+            # #Add the current URL path to set of already visited paths 
+            # else: 
+            #     already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
+            #     return_val = True
+
+        else:
+            print "URL out of domain: ", url
+
+        if not return_val:  #Counting invalid links
+            num_invalid_links += 1
+
         print return_val
         return return_val
 
@@ -189,50 +231,110 @@ def convertToAbsolute(url, links):
         Not handled mailto and fragments(#)
         Also, javascript needs to be handled
     '''
+
+    global subdomains_visited
     parsed_url = urlparse(url)
+
+    # To maintain a dict of subdomains visted
+    subdomains_visited[parsed_url.netloc] = subdomains_visited.get(parsed_url.netloc, 0) + 1
+
     base_url = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path
     absolutelinks = list()
-    with open("output101.txt","a") as op:
-        for link in links:
-            link = link.strip()
+    # with open("output101.txt","a") as op:
+    for link in links:
+        link = link.strip()
 
-            if link.find('http') == 0 and is_valid(link):
-                print "Absolute = " + link 
-                absolutelinks.append(link)
+        if link.find('http') == 0 and is_absolute_valid(link):
+            print "Absolute = " + link 
+            absolutelinks.append(link)
 
-            elif link.find('//') == 0 and is_valid(link):
-                print "Second Absolute = " + link
-                absolutelinks.append(link)
+        elif link.find('//') == 0 and is_absolute_valid(link):
+            print "Second Absolute = " + link
+            absolutelinks.append(link)
 
-            elif link.find('#') == 0 or link.find("javascript") == 0 or link.find("mailto") == 0: #****
-                print "#"
-                pass
+        elif link.find('#') == 0 or link.find("javascript") == 0 or link.find("mailto") == 0: #****
+            print "#"
+            pass
 
-            elif link.find("/") == 0:
-                if re.match(".*\.(asp|aspx|axd|asx|asmx|ashx|css|cfm|yaws|swf|html|htm|xhtml" \
-                    + "|jhtmljsp|jspx|wss|do|action|js|pl|php|php4|php3|phtml|py|rb|rhtml|shtml|xml|rss|svg|cgi|dll)$", parsed_url.path.lower()):
-                    # print "\n\n\n\nHere\n\n\n\n"
-                    index = parsed_url.path.rfind("/")
-                    parent_path = parsed_url.path[:index]
-                    result = parsed_url.scheme +"://"+ parsed_url.netloc + parent_path + link
-                    #print "Case3"
-                else:
-                    result = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path.rstrip("/") + link
-                    #print "Case3 Else" 
-                if(is_valid(result)):
-                    print "Case 3 " + result
-                    absolutelinks.append(result)
+        # elif link.find("/") == 0:
+        #     url_given = parsed_url.path.lower().strip().rstrip("/")
+        #     if re.match(".*\.(asp|aspx|axd|asx|asmx|ashx|css|cfm|yaws|swf|html|htm|xhtml" \
+        #         + "|jhtmljsp|jspx|wss|do|action|js|pl|php|php4|php3|phtml|py|rb|rhtml|shtml|xml|rss|svg|cgi|dll)$", url_given):
+        #         # print "\n\n\n\nHere\n\n\n\n"
 
-            else:
-                
-                result=urljoin(base_url,link)
-                if(is_valid(result)):
-                    print "Else = " + result
-                    absolutelinks.append(result)
-        
-        print base_url
-        op.write("Base_url = " + base_url + '\n' )
-        for urls in absolutelinks:
-            print "Link= " + urls +"\n"
-            op.write("Link= " +urls +'\n')
+        #         index = url_given.rfind("/")
+        #         parent_path = parsed_url.path[:index]
 
+        #         print "URL: ", parsed_url.netloc, " : ", parsed_url.path, " -> ", parent_path, "-> ", link
+        #         result = parsed_url.scheme +"://"+ parsed_url.netloc + parent_path + link
+        #         print "Case3", result
+        #     else:
+        #         result = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path.rstrip("/") + link
+        #         print "Case3 Else" 
+
+        #     if(is_valid(result)):
+        #         print "Case 3 " + result
+        #         absolutelinks.append(result)
+
+        else:
+            
+            result = urljoin(base_url,link)
+            if(is_absolute_valid(result)):
+                print "Else = " + result
+                absolutelinks.append(result)
+    
+    print base_url
+    # op.write("Base_url = " + base_url + '\n' )
+    for urls in absolutelinks:
+        print "Link= " + urls +"\n"
+        # op.write("Link= " +urls +'\n')
+    return absolutelinks
+
+
+
+def is_absolute_valid(url):
+    '''
+    Function returns True or False based on whether the url has to be downloaded or not.
+    Robot rules and duplication rules are checked separately.
+
+    This is a great place to filter out crawler traps.
+    '''
+    # global num_invalid_links
+    # global already_visited
+
+    
+
+    parsed = urlparse(url)
+    if parsed.scheme not in set(["http", "https"]):
+        return False
+    try:
+        return_val = True
+
+        return_val = ".ics.uci.edu" in parsed.hostname \
+        and not re.match(".*\.(css|js|bmp|gif|jpe?g|ico" + "|png|tiff?|mid|mp2|mp3|mp4"\
+        + "|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf" \
+        + "|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1" \
+        + "|thmx|mso|arff|rtf|jar|csv"\
+        + "|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+
+       # print "Parsed hostname : ", parsed.hostname, " : "
+        '''
+        Check here for crawler traps
+        '''
+        if(return_val): #Only if the url is valid check for the traps
+
+            # 1. Repeating directories
+            if re.match("^.*?(/.+?/).*?\\1.*$|^.*?/(.+?/)\\2.*$", parsed.path.lower()):
+                print "In Repeating Directories"
+                print url
+                return_val = False       
+
+
+        else:
+            print "URL out of domain: ", url
+
+        print return_val
+        return return_val
+
+    except TypeError:
+        print ("TypeError for ", parsed)
