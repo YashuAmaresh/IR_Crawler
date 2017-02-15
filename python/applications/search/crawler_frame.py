@@ -193,12 +193,16 @@ def is_valid(url):
         + "|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf" \
         + "|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1" \
         + "|thmx|mso|arff|rtf|jar|csv"\
-        + "|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()) and is_url_absolute(url)
+        + "|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()) 
 
        # print "Parsed hostname : ", parsed.hostname, " : "
         '''
         Check here for crawler traps
         '''
+
+        if return_val and not is_url_absolute(url):
+            return_val = False
+
         if(return_val): #Only if the url is valid check for the traps
 
             # 1. Repeating directories
@@ -247,8 +251,10 @@ def convertToAbsolute(url, links):
     global subdomains_visited
     parsed_url = urlparse(url)
 
+    if ".ics.uci.edu" in parsed_url.netloc:
+        subdomains_visited[parsed_url.netloc] = subdomains_visited.get(parsed_url.netloc, 0) + 1
     # To maintain a dict of subdomains visted
-    subdomains_visited[parsed_url.netloc] = subdomains_visited.get(parsed_url.netloc, 0) + 1
+    
 
     base_url = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path
     absolutelinks = list()
@@ -267,26 +273,6 @@ def convertToAbsolute(url, links):
         elif link.find('#') == 0 or link.find("javascript") == 0 or link.find("mailto") == 0: #****
             print "#"
             pass
-
-        # elif link.find("/") == 0:
-        #     url_given = parsed_url.path.lower().strip().rstrip("/")
-        #     if re.match(".*\.(asp|aspx|axd|asx|asmx|ashx|css|cfm|yaws|swf|html|htm|xhtml" \
-        #         + "|jhtmljsp|jspx|wss|do|action|js|pl|php|php4|php3|phtml|py|rb|rhtml|shtml|xml|rss|svg|cgi|dll)$", url_given):
-        #         # print "\n\n\n\nHere\n\n\n\n"
-
-        #         index = url_given.rfind("/")
-        #         parent_path = parsed_url.path[:index]
-
-        #         print "URL: ", parsed_url.netloc, " : ", parsed_url.path, " -> ", parent_path, "-> ", link
-        #         result = parsed_url.scheme +"://"+ parsed_url.netloc + parent_path + link
-        #         print "Case3", result
-        #     else:
-        #         result = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path.rstrip("/") + link
-        #         print "Case3 Else" 
-
-        #     if(is_valid(result)):
-        #         print "Case 3 " + result
-        #         absolutelinks.append(result)
 
         else:
             
@@ -393,5 +379,3 @@ def is_absolute_valid(url):
 
     except TypeError:
         print ("TypeError for ", parsed)
-
-
