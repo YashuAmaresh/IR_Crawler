@@ -108,6 +108,7 @@ def extract_next_links(rawDatas):
     '''
     global max_outlinks
     global max_outlinks_url
+    global subdomains_visited
 
     outputLinks = list()
     from bs4 import BeautifulSoup
@@ -133,8 +134,17 @@ def extract_next_links(rawDatas):
 
         else:
             print "Not yet visited"
+            print "URL: ", curr_url, "-----", parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/")
             already_visited.add(parsed.netloc.lower() + "/" + parsed.path.lower().lstrip("/"))
             # return_val = True
+
+        if ".ics.uci.edu" in parsed.netloc.lower():
+            subdomains_visited[parsed.netloc] = subdomains_visited.get(parsed.netloc, 0) + 1
+            print "Added to list of subdomains"
+            # To maintain a dict of subdomains visted
+
+        else:
+         print "Bad URL not added to list of subdomains - ", parsed.netloc
 
         if htmlStr and htmlStr.strip() != "":
 
@@ -147,7 +157,7 @@ def extract_next_links(rawDatas):
             try:
                 root = html.fromstring(htmlStr)
 
-            except ParserError:
+            except Exception as e:
                 print "Parse Error occured"
                 continue
 
@@ -259,13 +269,7 @@ def convertToAbsolute(url, links):
     parsed_url = urlparse(url)
     # print "Here in convert to absolute"
 
-    if "ics.uci.edu" in parsed_url.netloc:
-        subdomains_visited[parsed_url.netloc] = subdomains_visited.get(parsed_url.netloc, 0) + 1
-        print "Added to list of subdomains"
-    # To maintain a dict of subdomains visted
-
-    else:
-        print "Bad URL not added to list of subdomains - ", parsed_url.netloc
+    
 
     base_url = parsed_url.scheme +"://"+ parsed_url.netloc + parsed_url.path
     absolutelinks = list()
